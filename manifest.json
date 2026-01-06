@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Flips - Fifa Application Extension",
+  "version": "4.0",
+  "description": "Auto-fill login form from API and submit",
+  "author": "Shorif Ahamed",
+  "icons": {
+    "16": "genie.png",
+    "48": "genie.png",
+    "128": "genie.png"
+  },
+  "permissions": ["scripting", "tabs", "activeTab", "webNavigation"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://payment-p8.secutix.com/*",
+    "https://payment-p8.secutix.com/alias",
+    "https://fifa-fwc26-us.tickets.fifa.com/*",
+    "<all_urls>"
+  ],
+  "action": {
+    "default_title": "Auto Fill Card Info"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://localhost/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
