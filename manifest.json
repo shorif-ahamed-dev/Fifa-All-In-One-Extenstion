@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Flips - Fifa Application Extension",
-  "version": "4.0",
+  "name": "Fifa - All in One Extension",
+  "version": "1.1",
   "description": "Auto-fill login form from API and submit",
   "author": "Shorif Ahamed",
   "icons": {
@@ -9,7 +9,13 @@
     "48": "genie.png",
     "128": "genie.png"
   },
-  "permissions": ["scripting", "tabs", "activeTab", "webNavigation"],
+  "permissions": [
+    "scripting",
+    "tabs",
+    "activeTab",
+    "webNavigation",
+    "notifications"
+  ],
   "host_permissions": [
     "http://localhost:3000/*",
     "https://payment-p8.secutix.com/*",

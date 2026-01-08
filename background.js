@@ -2,7 +2,7 @@
 const API_BASE = "http://localhost:3000/api";
 const IFRAME_CHECK_INTERVAL = 250;
 
-// 🔹 helper
+// 🔹 Helper Functions
 async function postStatus(email, status) {
   try {
     await fetch(`${API_BASE}/update-status`, {
@@ -72,12 +72,11 @@ async function getUserFullName(tabId) {
 
     return name || "Unknown User";
   } catch {
-    console.warn("⚠️ Header iframe not accessible");
     return "Unknown User";
   }
 }
 
-// 🔹 login
+// 🔹 Login Functions
 function detectLoginForm() {
   const hasLogin = Boolean(
     document.querySelector("input[type=email], input[name=email], #email") &&
@@ -117,6 +116,7 @@ function fillLoginForm(data) {
 
   return true;
 }
+
 function fillSignupForm(data) {
   if (document.readyState !== "complete") {
     window.addEventListener("load", () => fillSignupForm(data), {
@@ -132,8 +132,21 @@ function fillSignupForm(data) {
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
   };
+  const firstnameEl = document.querySelector("#firstname");
+  const lastnameEl = document.querySelector("#lastname");
 
-  setValue("#firstname", data.name);
+  const fullName = data.name?.trim() || "";
+  const parts = fullName.split(/\s+/);
+
+  if (firstnameEl && lastnameEl) {
+    // Form has separate first + last name
+    setValue("#firstname", parts[0] || "");
+    setValue("#lastname", parts.slice(1).join(" ") || "");
+  } else if (firstnameEl) {
+    // Form has only one name field (first/full name)
+    setValue("#firstname", fullName);
+  }
+
   setValue("#email", data.email);
   setValue("#gender", data.gender);
 
@@ -156,31 +169,7 @@ async function getUnusedLogin() {
   return fetchJson(`${API_BASE}/search/status?value=N/A`);
 }
 
-// 🔹 Payment
-async function handlePayment(tabId) {
-  try {
-    // 2️⃣ Extract User Name
-    const fullName = await getUserFullName(tab.id);
-    const paymentFrame = await waitForIframeByUrl(
-      tabId,
-      "payment-p8.secutix.com/alias"
-    );
-    const cardData = await getCardDataByName(fullName);
-    if (!cardData) return false;
-
-    await exec(tabId, {
-      target: { frameIds: [paymentFrame.frameId] },
-      func: fillCardFormInIframe,
-      args: [cardData],
-    });
-
-    return true;
-  } catch {
-    console.warn("⚠️ Payment iframe not found");
-    return false;
-  }
-}
-
+// 🔹 Payment Functions
 async function getCardDataByName(fullName) {
   return fetchJson(
     `${API_BASE}/search/name?value=${encodeURIComponent(fullName)}`
@@ -195,6 +184,7 @@ function fillCardFormInIframe(data) {
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
   }
+
   const fields = {
     number: document.querySelector("#card_number, input[name='cardnumber']"),
     holder: document.querySelector("#card_holder, input[name='cardholder']"),
@@ -219,6 +209,7 @@ function fillCardFormInIframe(data) {
 
   if (!addNowBtn) return false;
 
+  // Uncomment to auto-click payment button
   // addNowBtn.click();
 
   return true;
@@ -232,12 +223,15 @@ function runTicketAutomation(data) {
         .split(",")
         .map((v) => v.trim())
         .filter(Boolean);
+
   const category = Number(data.category);
   const quantity = Number(data.quantity);
 
   const ul = document.getElementById(
     "stx-lt-product-subscription-10229225515651"
   );
+
+  if (!ul) return false;
 
   const listItems = ul.querySelectorAll("li");
 
@@ -263,6 +257,7 @@ function runTicketAutomation(data) {
       const categoryIndex = category - 1;
 
       if (!categories[categoryIndex]) return;
+
       categories[categoryIndex].click();
 
       const increaseBtn = li.querySelector(
@@ -282,66 +277,80 @@ function runTicketAutomation(data) {
 
 // 🔹 Main Extension Flow
 chrome.action.onClicked.addListener(async (tab) => {
+  console.log("extenstion clicked");
   if (!tab?.id) return;
 
+  // 1️⃣ Detect Page Type
+  const { hasLogin, hasSignup, hasApplication } = await exec(tab.id, {
+    func: detectLoginForm,
+  });
+
   try {
-    // 1️⃣ Login Flow
-    const { hasLogin, hasSignup, hasApplication } = await exec(tab.id, {
-      func: detectLoginForm,
+    console.log("Page Detection:", {
+      hasLogin,
+      hasSignup,
+      hasApplication,
     });
+
+    // 2️⃣ Handle Login Page
     if (hasLogin) {
       const loginData = await getUnusedLogin();
-      if (loginData) {
-        await exec(tab.id, { func: fillLoginForm, args: [loginData] });
-        await postStatus(loginData.email, "Used");
-      }
+      if (!loginData) return;
+
+      await exec(tab.id, { func: fillLoginForm, args: [loginData] });
+      await postStatus(loginData.email, "Used");
       return;
     }
+
+    // 3️⃣ Handle Signup Page
     if (hasSignup) {
       const signUpData = await getUnusedLogin();
-      if (signUpData) {
-        await exec(tab.id, { func: fillSignupForm, args: [signUpData] });
-        await postStatus(signUpData.email, "Used");
-      }
+
+      if (!signUpData) return;
+
+      await exec(tab.id, { func: fillSignupForm, args: [signUpData] });
+      await postStatus(signUpData.email, "Used");
       return;
     }
+
+    // 4️⃣ Handle Ticket Application Page
     if (hasApplication) {
       const name = await getUserFullName(tab.id);
       const data = await getCardDataByName(name);
-      if (!data) return false;
-      exec(tab.id, {
+      console.log("Fetched ticket automation data:", name, data);
+      if (!data) return;
+
+      await exec(tab.id, {
         func: runTicketAutomation,
         args: [data],
       });
       return;
     }
-    // Run ticket automation after login
 
-    // 3️⃣ Payment Flow
-    // Step 3: Fill payment iframe
+    // 5️⃣ Handle Payment Page
+    try {
+      const paymentIframe = await waitForIframeByUrl(
+        tab.id,
+        "payment-p8.secutix.com/alias",
+        15000
+      );
 
-    const paymentIframe = await waitForIframeByUrl(
-      tab.id,
-      "https://payment-p8.secutix.com/alias",
-      15000
-    );
-    if (!paymentIframe) return;
+      if (paymentIframe.frameId) {
+        const fullname = await getUserFullName(tab.id);
+        const apiData = await getCardDataByName(fullname);
+        console.log("Fetched card data:", apiData);
+        if (!apiData) return;
 
-    if (paymentIframe.frameId) {
-      const fullname = await getUserFullName(tab.id);
-      const apiData = await getCardDataByName(fullname);
-      try {
         await chrome.scripting.executeScript({
           target: { tabId: tab.id, frameIds: [paymentIframe.frameId] },
           func: fillCardFormInIframe,
           args: [apiData],
         });
-        await postStatus(data.email, "Done");
-      } catch (err) {
-        console.error("Payment iframe not found or injection failed:", err);
+
+        await postStatus(apiData.email, "Done");
       }
-    }
+    } catch {}
   } catch (err) {
-    console.error("❌ Extension error:", err);
+    console.error("Error in extension flow:", err);
   }
 });

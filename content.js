@@ -66,14 +66,6 @@ function initSecondFormAutoFill() {
     .then((res) => res.json())
     .then((data) => {
       if (data && data.email) fillSecondForm(data);
-      fetch("http://localhost:3000/api/update-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: data.email,
-          status: "Interest Submitted",
-        }),
-      });
     })
     .catch((err) => console.error("Failed to fetch FIFA form data:", err));
 }
@@ -109,12 +101,12 @@ window.addEventListener("load", () => {
     const confirmPassword = document.querySelector("#confirm-password");
     const terms = document.querySelector("#TandC");
 
-    if (!password || !confirmPassword || !terms) return false;
+    if (password && confirmPassword && terms) {
+      password.value = "Tickets@123";
+      confirmPassword.value = "Tickets@123";
+      terms.checked = true;
+    }
 
-    // Fill password
-    password.value = "Tickets@123";
-    confirmPassword.value = "Tickets@123";
-    terms.checked = true;
     // continue button
 
     const continueBtnss = [...document.querySelectorAll("button")].find(
