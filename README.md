@@ -1,7 +1,7 @@
 # Dashboard Header & Example Data
 
 **Header (fields):**  
-status,email,password,name,gender,day,month,year,country,city,state,address,postcode,phone_number,card_number,card_month,card_year,cvv
+status,email,password,name,gender,day,month,year,country,city,state,address,postcode,phone_number,card_number,card_month,card_year,cvv,matches,category,quantity
 
 ---
 
